@@ -1,0 +1,40 @@
+{
+  "package_name": "pocket-sysmon",
+  "version": "1.1.2",
+  "app_name": "SysMon",
+  "bin_name": "pocket-sysmon",
+  "description": "CPU, processes, network, power, bubble level and sound meter",
+  "store": {
+    "summary": "System monitor: CPU, processes, network speed, battery, level and sound meter",
+    "description": "SysMon shows what your CardputerZero is doing, across six pages. Overview: CPU with a 60-second graph, per-core load, RAM, temperature and battery. Processes: the top 5 by CPU or memory, and you can end one from the keyboard. Network: interfaces, Wi-Fi signal and a live download/upload speed graph. Power: 4-minute temperature history, battery time-left / time-to-full estimate, disk and uptime. Level: a bubble level from the built-in motion sensor. Sound: a live microphone loudness meter. Left/Right or Tab switch pages, 1-6 jump, ESC quits.",
+    "categories": [
+      "System Tools"
+    ],
+    "screenshots": [
+      "screenshots/page1.png",
+      "screenshots/page2.png",
+      "screenshots/page3.png",
+      "screenshots/page4.png",
+      "screenshots/page5.png",
+      "screenshots/page6.png"
+    ],
+    "icon": "packaging/store_icon.png",
+    "license": "MIT",
+    "source_repo": "https://github.com/duanesweazy1/pocket-sysmon",
+    "author": {
+      "github": "duanesweazy1",
+      "display_name": "Duane Sweazy"
+    },
+    "share_code": "SMON",
+    "permissions": {
+      "camera": false,
+      "microphone": true,
+      "imu": true,
+      "network": false,
+      "additional_hardware": false,
+      "background_service": false,
+      "external_display": false
+    },
+    "locales": {}
+  }
+}
