@@ -70,8 +70,5 @@ chmod +x /path/to/sysmon/packaging/*.sh /path/to/sysmon/packaging/postinst
 scripts/pack-deb.sh /path/to/sysmon --output-dir dist
 ```
 
-## Publish to the Store
-
-With a clone of `CardputerZero/AppBuilder`, run `czdev login`, then `czdev publish --deb pocket-sysmon_<version>-rev1_arm64.deb` from this folder. The first release needs a short video of the app running on a real device, posted on the pull request.
 
 License: MIT. See [LICENSE](LICENSE).
