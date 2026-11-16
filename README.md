@@ -21,13 +21,13 @@ A six-page system monitor for the M5Stack CardputerZero's 320×170 screen.
 
 | Key | Action |
 |---|---|
-| ← → or Tab | Previous / next page |
+| Z / C (◀ ▶) or Tab | Previous / next page |
 | 1 – 6 | Jump to a page |
 | ESC or Q | Quit (or cancel a prompt) |
-| **Processes:** ↑ ↓ | Select a program |
+| **Processes:** F / X (▲ ▼) | Select a program |
 | **Processes:** Enter or K, then Y | End the selected program |
 | **Processes:** S | Sort by CPU or memory |
-| **Level:** Enter or Z | Use the current angle as zero (calibrate on a surface you know is flat) |
+| **Level:** Enter | Use the current angle as zero (calibrate on a surface you know is flat) |
 | **Level:** X | Clear the zero |
 | **Sound:** Enter | Calibrate: press in a quiet room to save that as "quiet" (kept between runs) |
 | **Sound:** X | Clear the sound calibration |
@@ -39,9 +39,9 @@ Ending a process sends it a normal "please stop" signal (SIGTERM). Programs owne
 Download the `.deb` from [Releases](https://github.com/duanesweazy1/pocket-sysmon/releases). Then, from PowerShell (Windows) or a terminal on your PC (use your Cardputer username and the IP shown in its **IP Panel** app):
 
 ```
-scp pocket-sysmon_1.1.2-rev1_arm64.deb YOURUSER@DEVICE-IP:/tmp/
+scp pocket-sysmon_1.1.3-rev1_arm64.deb YOURUSER@DEVICE-IP:/tmp/
 ssh YOURUSER@DEVICE-IP
-sudo apt install /tmp/pocket-sysmon_1.1.2-rev1_arm64.deb
+sudo apt install /tmp/pocket-sysmon_1.1.3-rev1_arm64.deb
 sudo reboot
 ```
 
@@ -70,5 +70,8 @@ chmod +x /path/to/sysmon/packaging/*.sh /path/to/sysmon/packaging/postinst
 scripts/pack-deb.sh /path/to/sysmon --output-dir dist
 ```
 
+## Publish to the Store
+
+With a clone of `CardputerZero/AppBuilder`, run `czdev login`, then `czdev publish --deb pocket-sysmon_<version>-rev1_arm64.deb` from this folder. The first release needs a short video of the app running on a real device, posted on the pull request.
 
 License: MIT. See [LICENSE](LICENSE).

@@ -12,10 +12,10 @@ Pages
   6 Sound      microphone loudness meter (ES8389 codec)
 
 Keys
-  Left/Right or Tab   previous/next page        1-6   jump to page
+  Z / C (arrow keys) or Tab   previous/next page   1-6 jump to page
   ESC or Q            quit (or cancel a prompt)
-  Processes: Up/Down select, Enter or K end process, S switch CPU/MEM sort
-  Level:     Enter or Z set current angle as zero, X clear zero
+  Processes: F / X select, Enter or K end process, S switch CPU/MEM sort
+  Level:     Enter set current angle as zero, X clear zero
   Sound:     Enter calibrate 'quiet' (saved), X clear calibration
 
 Run with  --preview out.png PAGE [--mock]  to render one frame to a PNG.
@@ -44,7 +44,7 @@ try:
 except ImportError:
     HAS_NUMPY = False
 
-VERSION = "1.1.2"
+VERSION = "1.1.3"
 
 # --------------------------------------------------------------------------
 # Constants
@@ -74,6 +74,7 @@ KEY_S, KEY_K, KEY_SEMICOLON = 31, 37, 39
 KEY_Z, KEY_X, KEY_N, KEY_COMMA, KEY_DOT, KEY_SLASH = 44, 45, 49, 51, 52, 53
 KEY_SPACE = 57
 KEY_UP, KEY_LEFT, KEY_RIGHT, KEY_DOWN = 103, 105, 106, 108
+KEY_F, KEY_C = 33, 46   # Cardputer arrows: F up, X down, Z left, C right
 NUM_KEYS = {KEY_1: 0, KEY_2: 1, KEY_3: 2, KEY_4: 3, KEY_5: 4, KEY_6: 5}
 
 # Colours (dark theme)
@@ -997,7 +998,7 @@ class Renderer:
             d.text((202, 134), "n/a", font=self.f_med, fill=DIM)
 
         ip = next((i["ip"] for i in s["ifaces"] if i["ip"]), None)
-        self.footer(d, "←→ page   1-6 jump   ESC quit", ip)
+        self.footer(d, "Z/C page   1-6 jump   ESC quit", ip)
 
     # -- page 2: processes --
     def page_procs(self, d, s, ui):
@@ -1026,7 +1027,7 @@ class Renderer:
             y += 22
         if not rows:
             d.text((12, 60), "reading processes…", font=self.f_reg, fill=DIM)
-        self.footer(d, "↑↓ select  Enter end  S sort  ←→ page")
+        self.footer(d, "F/X select  Enter end  S sort  Z/C page")
         if ui.get("confirm"):
             r = ui["confirm"]
             box = (40, 52, 280, 122)
@@ -1081,7 +1082,7 @@ class Renderer:
         self.graph(d, gbox, net.rx_hist, GREEN, GREEN_FILL, vmax=peak)
         self.graph(d, gbox, net.tx_hist, ORANGE, None, vmax=peak)
         self.text_right(d, 310, 94, "max " + fmt_rate(peak), self.f_sm, DIM)
-        self.footer(d, "last 60 s   ←→ page   ESC quit")
+        self.footer(d, "last 60 s   Z/C page   ESC quit")
 
     # -- page 4: power & thermal --
     def page_power(self, d, s):
@@ -1149,7 +1150,7 @@ class Renderer:
             d.text((116, 135), "{}/{}".format(fmt_mb(used), fmt_mb(total)),
                    font=self.f_sm, fill=TEXT)
         self.text_right(d, 310, 135, "up " + fmt_duration(s["uptime"]), self.f_sm, TEXT)
-        self.footer(d, "←→ page   ESC quit", s["host"][:18], DIM)
+        self.footer(d, "Z/C page   ESC quit", s["host"][:18], DIM)
 
     # -- page 5: bubble level --
     def page_level(self, d, s):
@@ -1160,7 +1161,7 @@ class Renderer:
             self.text_center(d, 160, 62, "No motion sensor found", self.f_med, TEXT)
             self.text_center(d, 160, 84, "The Lite model has no IMU, or the", self.f_reg, DIM)
             self.text_center(d, 160, 100, "bmi270 driver is not loaded.", self.f_reg, DIM)
-            self.footer(d, "←→ page   ESC quit")
+            self.footer(d, "Z/C page   ESC quit")
             return
         level = abs(imu["pitch"]) < 1.0 and abs(imu["roll"]) < 1.0
         ring = GREEN if level else DIM
@@ -1193,7 +1194,7 @@ class Renderer:
             d.text((172, 109), "tilt {:.1f}°".format(tilt), font=self.f_reg, fill=YELLOW)
         d.text((172, 128), "{:.2f} g{}".format(imu["g"], "   zeroed" if imu["zeroed"] else ""),
                font=self.f_sm, fill=PURPLE if imu["zeroed"] else DIM)
-        self.footer(d, "Enter: set zero   X: clear   ←→ page")
+        self.footer(d, "Enter: set zero   X: clear   Z/C page")
 
     # -- page 6: sound meter --
     def page_sound(self, d, s):
@@ -1205,7 +1206,7 @@ class Renderer:
             msg = (mic.error if mic else "") or ""
             for i, line in enumerate(textwrap.wrap(msg, 46)[:3]):
                 self.text_center(d, 160, 86 + i * 14, line, self.f_sm, DIM)
-            self.footer(d, "←→ page   ESC quit")
+            self.footer(d, "Z/C page   ESC quit")
             return
         db = mic.db if mic.db is not None else -90.0
         rel = mic.rel
@@ -1521,21 +1522,21 @@ class App:
             elif code in (KEY_N, KEY_ESC, KEY_Q):
                 ui["confirm"] = None
             return True
-        if repeat and code not in (KEY_UP, KEY_DOWN, KEY_SEMICOLON, KEY_DOT):
+        if repeat and code not in (KEY_UP, KEY_DOWN, KEY_SEMICOLON, KEY_DOT, KEY_F, KEY_X):
             return True
         if code in (KEY_ESC, KEY_Q):
             return False
-        if code in (KEY_RIGHT, KEY_TAB, KEY_SLASH):
+        if code in (KEY_RIGHT, KEY_TAB, KEY_SLASH, KEY_C):
             self.set_page(self.page + 1)
-        elif code in (KEY_LEFT, KEY_COMMA):
+        elif code in (KEY_LEFT, KEY_COMMA, KEY_Z):
             self.set_page(self.page - 1)
         elif code in NUM_KEYS:
             self.set_page(NUM_KEYS[code])
         elif self.page == P_PROCS:
             n = len(self.c.procs.top(5))
-            if code in (KEY_UP, KEY_SEMICOLON):
+            if code in (KEY_UP, KEY_SEMICOLON, KEY_F):
                 ui["sel"] = max(0, ui["sel"] - 1)
-            elif code in (KEY_DOWN, KEY_DOT):
+            elif code in (KEY_DOWN, KEY_DOT, KEY_X):
                 ui["sel"] = min(max(0, n - 1), ui["sel"] + 1)
             elif code == KEY_S:
                 p = self.c.procs
@@ -1545,7 +1546,7 @@ class App:
             elif code in (KEY_ENTER, KEY_K) and n:
                 ui["confirm"] = dict(self.c.procs.top(5)[min(ui["sel"], n - 1)])
         elif self.page == P_SOUND:
-            if code in (KEY_ENTER, KEY_Z, KEY_SPACE):
+            if code in (KEY_ENTER, KEY_SPACE):
                 if self.c.mic.calibrate():
                     self.toast("Quiet level saved: {:.0f} dBFS".format(self.c.mic.baseline), GREEN)
                 else:
@@ -1554,7 +1555,7 @@ class App:
                 self.c.mic.clear_calibration()
                 self.toast("Calibration cleared")
         elif self.page == P_LEVEL:
-            if code in (KEY_ENTER, KEY_Z, KEY_SPACE):
+            if code in (KEY_ENTER, KEY_SPACE):
                 self.c.imu.set_zero()
                 self.toast("Zero set to current angle")
             elif code == KEY_X:
