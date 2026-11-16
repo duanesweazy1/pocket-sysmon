@@ -21,10 +21,10 @@ A six-page system monitor for the M5Stack CardputerZero's 320×170 screen.
 
 | Key | Action |
 |---|---|
-| Z / C (◀ ▶) or Tab | Previous / next page |
+| ◀ ▶ (the Z / C keys) or Tab | Previous / next page |
 | 1 – 6 | Jump to a page |
 | ESC or Q | Quit (or cancel a prompt) |
-| **Processes:** F / X (▲ ▼) | Select a program |
+| **Processes:** ▲ ▼ (the F / X keys) | Select a program |
 | **Processes:** Enter or K, then Y | End the selected program |
 | **Processes:** S | Sort by CPU or memory |
 | **Level:** Enter | Use the current angle as zero (calibrate on a surface you know is flat) |
@@ -39,9 +39,9 @@ Ending a process sends it a normal "please stop" signal (SIGTERM). Programs owne
 Download the `.deb` from [Releases](https://github.com/duanesweazy1/pocket-sysmon/releases). Then, from PowerShell (Windows) or a terminal on your PC (use your Cardputer username and the IP shown in its **IP Panel** app):
 
 ```
-scp pocket-sysmon_1.1.3-rev1_arm64.deb YOURUSER@DEVICE-IP:/tmp/
+scp pocket-sysmon_1.1.4-rev1_arm64.deb YOURUSER@DEVICE-IP:/tmp/
 ssh YOURUSER@DEVICE-IP
-sudo apt install /tmp/pocket-sysmon_1.1.3-rev1_arm64.deb
+sudo apt install /tmp/pocket-sysmon_1.1.4-rev1_arm64.deb
 sudo reboot
 ```
 

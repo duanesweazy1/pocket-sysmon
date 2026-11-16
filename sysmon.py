@@ -44,7 +44,7 @@ try:
 except ImportError:
     HAS_NUMPY = False
 
-VERSION = "1.1.3"
+VERSION = "1.1.4"
 
 # --------------------------------------------------------------------------
 # Constants
@@ -91,6 +91,7 @@ YELLOW = (255, 205, 60)
 ORANGE = (255, 140, 50)
 ORANGE_FILL = (80, 45, 20)
 RED = (255, 75, 75)
+KEY_RED = (235, 70, 70)   # the red arrow markings on the keyboard
 RED_FILL = (80, 28, 28)
 PURPLE = (175, 125, 255)
 
@@ -930,8 +931,21 @@ class Renderer:
                             self.f_reg, DIM)
         self.battery_icon(d, W - 28, 4, batt)
 
+    def hint_text(self, d, x, y, text, font, col):
+        """Draw a key hint; the arrow triangles are drawn red like the keys printed on the keyboard."""
+        run, red = "", False
+        for ch in text + "\0":
+            is_red = ch in "\u25b2\u25bc\u25c0\u25b6"
+            if (is_red != red or ch == "\0") and run:
+                d.text((x, y), run, font=font, fill=KEY_RED if red else col)
+                x += d.textlength(run, font=font)
+                run = ""
+            red = is_red
+            if ch != "\0":
+                run += ch
+
     def footer(self, d, hint, right=None, right_color=CYAN):
-        d.text((6, H - 13), hint, font=self.f_sm, fill=DIM)
+        self.hint_text(d, 6, H - 13, hint, self.f_sm, DIM)
         if right:
             self.text_right(d, 314, H - 13, right, self.f_sm, right_color)
 
@@ -998,7 +1012,7 @@ class Renderer:
             d.text((202, 134), "n/a", font=self.f_med, fill=DIM)
 
         ip = next((i["ip"] for i in s["ifaces"] if i["ip"]), None)
-        self.footer(d, "Z/C page   1-6 jump   ESC quit", ip)
+        self.footer(d, "◀▶ page   1-6 jump   ESC quit", ip)
 
     # -- page 2: processes --
     def page_procs(self, d, s, ui):
@@ -1027,7 +1041,7 @@ class Renderer:
             y += 22
         if not rows:
             d.text((12, 60), "reading processes…", font=self.f_reg, fill=DIM)
-        self.footer(d, "F/X select  Enter end  S sort  Z/C page")
+        self.footer(d, "▲▼ select  Enter end  S sort  ◀▶ page")
         if ui.get("confirm"):
             r = ui["confirm"]
             box = (40, 52, 280, 122)
@@ -1082,7 +1096,7 @@ class Renderer:
         self.graph(d, gbox, net.rx_hist, GREEN, GREEN_FILL, vmax=peak)
         self.graph(d, gbox, net.tx_hist, ORANGE, None, vmax=peak)
         self.text_right(d, 310, 94, "max " + fmt_rate(peak), self.f_sm, DIM)
-        self.footer(d, "last 60 s   Z/C page   ESC quit")
+        self.footer(d, "last 60 s   ◀▶ page   ESC quit")
 
     # -- page 4: power & thermal --
     def page_power(self, d, s):
@@ -1150,7 +1164,7 @@ class Renderer:
             d.text((116, 135), "{}/{}".format(fmt_mb(used), fmt_mb(total)),
                    font=self.f_sm, fill=TEXT)
         self.text_right(d, 310, 135, "up " + fmt_duration(s["uptime"]), self.f_sm, TEXT)
-        self.footer(d, "Z/C page   ESC quit", s["host"][:18], DIM)
+        self.footer(d, "◀▶ page   ESC quit", s["host"][:18], DIM)
 
     # -- page 5: bubble level --
     def page_level(self, d, s):
@@ -1161,7 +1175,7 @@ class Renderer:
             self.text_center(d, 160, 62, "No motion sensor found", self.f_med, TEXT)
             self.text_center(d, 160, 84, "The Lite model has no IMU, or the", self.f_reg, DIM)
             self.text_center(d, 160, 100, "bmi270 driver is not loaded.", self.f_reg, DIM)
-            self.footer(d, "Z/C page   ESC quit")
+            self.footer(d, "◀▶ page   ESC quit")
             return
         level = abs(imu["pitch"]) < 1.0 and abs(imu["roll"]) < 1.0
         ring = GREEN if level else DIM
@@ -1194,7 +1208,7 @@ class Renderer:
             d.text((172, 109), "tilt {:.1f}°".format(tilt), font=self.f_reg, fill=YELLOW)
         d.text((172, 128), "{:.2f} g{}".format(imu["g"], "   zeroed" if imu["zeroed"] else ""),
                font=self.f_sm, fill=PURPLE if imu["zeroed"] else DIM)
-        self.footer(d, "Enter: set zero   X: clear   Z/C page")
+        self.footer(d, "Enter: set zero   X: clear   ◀▶ page")
 
     # -- page 6: sound meter --
     def page_sound(self, d, s):
@@ -1206,7 +1220,7 @@ class Renderer:
             msg = (mic.error if mic else "") or ""
             for i, line in enumerate(textwrap.wrap(msg, 46)[:3]):
                 self.text_center(d, 160, 86 + i * 14, line, self.f_sm, DIM)
-            self.footer(d, "Z/C page   ESC quit")
+            self.footer(d, "◀▶ page   ESC quit")
             return
         db = mic.db if mic.db is not None else -90.0
         rel = mic.rel
