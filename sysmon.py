@@ -5,7 +5,7 @@ Draws straight to the Linux framebuffer (320x170) with Pillow.
 
 Pages
   1 Overview   CPU total/cores/history, RAM, temperature, battery
-  2 Processes  top 5 by CPU or memory, end a process from the keyboard
+  2 Processes  top 20 by CPU or memory (scrolls), end a process from the keyboard
   3 Network    interfaces, Wi-Fi signal, live download/upload speed graph
   4 Power      temperature history, battery time estimate, disk, uptime
   5 Level      bubble level from the BMI270 motion sensor
@@ -44,7 +44,7 @@ try:
 except ImportError:
     HAS_NUMPY = False
 
-VERSION = "1.1.4"
+VERSION = "1.1.5"
 
 # --------------------------------------------------------------------------
 # Constants
@@ -58,6 +58,8 @@ TEMP_HISTORY = 240    # seconds
 SOUND_HISTORY = 100   # samples at ~10 Hz
 BUBBLE_RANGE_DEG = 18.0  # same full-scale tilt as the official Compass app
 
+PROC_LIST = 20      # processes kept in the scrolling list
+PROC_ROWS = 5       # rows visible at once
 PAGES = ["Overview", "Processes", "Network", "Power", "Level", "Sound"]
 P_OVERVIEW, P_PROCS, P_NET, P_POWER, P_LEVEL, P_SOUND = range(6)
 FRAME_INTERVAL = {P_LEVEL: 1.0 / 15, P_SOUND: 1.0 / 10}  # others: 1 s
@@ -499,6 +501,7 @@ class ProcStats:
                     stat = f.read()
                 with open(pid_dir + "/statm") as f:
                     rss_pages = int(f.read().split()[1])
+                uid = os.stat(pid_dir).st_uid
             except (OSError, ValueError, IndexError):
                 continue
             lp, rp = stat.find("("), stat.rfind(")")
@@ -517,7 +520,7 @@ class ProcStats:
             cpu = 0.0
             if dt and pid in self.prev:
                 cpu = 100.0 * (ticks - self.prev[pid]) / (dt * CLK_TCK)
-            rows.append({"pid": pid, "name": name, "cpu": max(0.0, cpu), "rss": rss_mb,
+            rows.append({"pid": pid, "name": name, "uid": uid, "cpu": max(0.0, cpu), "rss": rss_mb,
                          "mem": 100.0 * rss_mb / max(1.0, mem_total_mb)})
         self.ready = dt is not None
         self.prev, self.prev_t = cur, now
@@ -528,8 +531,14 @@ class ProcStats:
         key = "cpu" if self.sort_by == "cpu" else "rss"
         self.rows.sort(key=lambda r: (r[key], r["rss"]), reverse=True)
 
-    def top(self, n=5):
+    def top(self, n=PROC_LIST):
         return self.rows[:n]
+
+    def index_of(self, pid, n=PROC_LIST):
+        for i, r in enumerate(self.rows[:n]):
+            if r["pid"] == pid:
+                return i
+        return None
 
 
 # -- motion sensor ---------------------------------------------------------
@@ -1023,25 +1032,49 @@ class Renderer:
         d.text((160, 25), "PID", font=self.f_smb, fill=DIM)
         self.text_right(d, 252, 25, "CPU" + (" ▼" if sort_cpu else ""), self.f_smb,
                         CYAN if sort_cpu else DIM)
-        self.text_right(d, 310, 25, "MEM" + ("" if sort_cpu else " ▼"), self.f_smb,
+        self.text_right(d, 306, 25, "MEM" + ("" if sort_cpu else " ▼"), self.f_smb,
                         DIM if sort_cpu else CYAN)
-        rows = procs.top(5)
+        rows = procs.top()
+        # keep the highlight on the same process when the list re-sorts
+        idx = procs.index_of(ui.get("sel_pid"))
+        if idx is not None:
+            ui["sel"] = idx
+        ui["sel"] = min(ui["sel"], max(0, len(rows) - 1))
+        first = ui.get("first", 0)
+        if ui["sel"] < first:
+            first = ui["sel"]
+        elif ui["sel"] >= first + PROC_ROWS:
+            first = ui["sel"] - PROC_ROWS + 1
+        first = max(0, min(first, max(0, len(rows) - PROC_ROWS)))
+        ui["first"] = first
+        me = os.getuid()
         y = 39
-        for i, r in enumerate(rows):
+        for i, r in enumerate(rows[first:first + PROC_ROWS], start=first):
             selected = i == ui["sel"]
             if selected:
-                d.rounded_rectangle((7, y - 1, 313, y + 20), radius=4, fill=SEL)
+                d.rounded_rectangle((7, y - 1, 309 if len(rows) > PROC_ROWS else 313, y + 20),
+                                    radius=4, fill=SEL)
             name = r["name"] if len(r["name"]) <= 17 else r["name"][:16] + "…"
-            d.text((12, y + 3), name, font=self.f_reg, fill=TEXT)
+            mine = me == 0 or r.get("uid", me) == me
+            d.text((12, y + 3), name, font=self.f_reg, fill=TEXT if mine else DIM)
             d.text((160, y + 4), str(r["pid"]), font=self.f_sm, fill=DIM)
             cpu_txt = "{:.0f}%".format(r["cpu"]) if procs.ready else "…"
             self.text_right(d, 252, y + 3, cpu_txt, self.f_reg,
                             level_color(r["cpu"], 50, 90) if procs.ready else DIM)
-            self.text_right(d, 310, y + 3, fmt_mb(r["rss"]), self.f_reg, TEXT)
+            self.text_right(d, 306, y + 3, fmt_mb(r["rss"]), self.f_reg, TEXT)
             y += 22
+        if len(rows) > PROC_ROWS:
+            # scroll bar on the right edge of the panel
+            tr = (312, 40, 314, 148)
+            d.rectangle(tr, fill=(40, 44, 52))
+            span = tr[3] - tr[1]
+            h = max(8, span * PROC_ROWS // len(rows))
+            top = tr[1] + (span - h) * first // max(1, len(rows) - PROC_ROWS)
+            d.rectangle((tr[0], top, tr[2], top + h), fill=CYAN)
         if not rows:
             d.text((12, 60), "reading processes…", font=self.f_reg, fill=DIM)
-        self.footer(d, "▲▼ select  Enter end  S sort  ◀▶ page")
+        pos = "{}/{}".format(ui["sel"] + 1, len(rows)) if rows else None
+        self.footer(d, "▲▼ select  Enter end  S sort  ◀▶ page", pos, DIM)
         if ui.get("confirm"):
             r = ui["confirm"]
             box = (40, 52, 280, 122)
@@ -1049,7 +1082,11 @@ class Renderer:
             self.text_center(d, 160, 60, "End this process?", self.f_med, TEXT)
             nm = r["name"] if len(r["name"]) <= 22 else r["name"][:21] + "…"
             self.text_center(d, 160, 80, "{}  (PID {})".format(nm, r["pid"]), self.f_reg, YELLOW)
-            self.text_center(d, 160, 100, "Y = end     N / ESC = cancel", self.f_sm, DIM)
+            if os.getuid() != 0 and r.get("uid", os.getuid()) != os.getuid():
+                self.text_center(d, 160, 98, "System process: needs admin rights", self.f_sm, ORANGE)
+                self.text_center(d, 160, 110, "Y = try anyway   N / ESC = cancel", self.f_sm, DIM)
+            else:
+                self.text_center(d, 160, 100, "Y = end     N / ESC = cancel", self.f_sm, DIM)
 
     # -- page 3: network --
     def page_net(self, d, s):
@@ -1509,7 +1546,7 @@ class App:
         if page == P_PROCS:
             self.c.procs.reset()
             self.c.procs.sample(self.c.s.get("mem", (0, 0, 1))[2])
-            self.ui["sel"] = 0
+            self.ui.update(sel=0, first=0, sel_pid=None)
         if page == P_SOUND:
             self.c.mic.start()
 
@@ -1547,18 +1584,19 @@ class App:
         elif code in NUM_KEYS:
             self.set_page(NUM_KEYS[code])
         elif self.page == P_PROCS:
-            n = len(self.c.procs.top(5))
-            if code in (KEY_UP, KEY_SEMICOLON, KEY_F):
-                ui["sel"] = max(0, ui["sel"] - 1)
-            elif code in (KEY_DOWN, KEY_DOT, KEY_X):
-                ui["sel"] = min(max(0, n - 1), ui["sel"] + 1)
+            rows = self.c.procs.top()
+            n = len(rows)
+            if code in (KEY_UP, KEY_SEMICOLON, KEY_F, KEY_DOWN, KEY_DOT, KEY_X) and n:
+                step = -1 if code in (KEY_UP, KEY_SEMICOLON, KEY_F) else 1
+                ui["sel"] = max(0, min(n - 1, min(ui["sel"], n - 1) + step))
+                ui["sel_pid"] = rows[ui["sel"]]["pid"]
             elif code == KEY_S:
                 p = self.c.procs
                 p.sort_by = "mem" if p.sort_by == "cpu" else "cpu"
                 p.sort()
-                ui["sel"] = 0
+                ui["sel"], ui["first"], ui["sel_pid"] = 0, 0, None
             elif code in (KEY_ENTER, KEY_K) and n:
-                ui["confirm"] = dict(self.c.procs.top(5)[min(ui["sel"], n - 1)])
+                ui["confirm"] = dict(rows[min(ui["sel"], n - 1)])
         elif self.page == P_SOUND:
             if code in (KEY_ENTER, KEY_SPACE):
                 if self.c.mic.calibrate():
@@ -1598,8 +1636,18 @@ def mock_collector():
         {"pid": 455, "name": "APPLaunch", "cpu": 12.0, "rss": 22.8, "mem": 5.3},
         {"pid": 1290, "name": "chromium-headless", "cpu": 9.0, "rss": 96.4, "mem": 22.6},
         {"pid": 377, "name": "NetworkManager", "cpu": 2.0, "rss": 9.1, "mem": 2.1},
-        {"pid": 301, "name": "systemd-journald", "cpu": 1.0, "rss": 6.4, "mem": 1.5},
+        {"pid": 301, "name": "systemd-journald", "cpu": 1.0, "rss": 6.4, "mem": 1.5, "uid": 0},
     ]
+    extra = [("sshd", 0), ("bash", None), ("wpa_supplicant", 0), ("pipewire", None),
+             ("systemd", 0), ("dbus-daemon", 0), ("avahi-daemon", 0), ("cron", 0),
+             ("systemd-logind", 0), ("wireplumber", None), ("agetty", 0),
+             ("systemd-udevd", 0), ("ModemManager", 0), ("polkitd", 0), ("rsyslogd", 0)]
+    for i, (nm, uid) in enumerate(extra):
+        row = {"pid": 520 + i * 37, "name": nm, "cpu": max(0.0, 0.8 - i * 0.05),
+               "rss": 5.8 - i * 0.3, "mem": 1.2 - i * 0.05}
+        if uid is not None:
+            row["uid"] = uid
+        c.procs.rows.append(row)
     c.procs.ready = True
     temps = deque([48 + 6 * math.sin(i / 30.0) + (4 if 150 < i < 190 else 0)
                    for i in range(TEMP_HISTORY)], maxlen=TEMP_HISTORY)
@@ -1642,9 +1690,9 @@ def preview(path, page, mock=False, confirm=False):
             c.fast(page)
     app = App(c)
     app.page = page
-    if confirm and c.procs.top(5):
+    if confirm and c.procs.top():
         app.ui["sel"] = 2
-        app.ui["confirm"] = dict(c.procs.top(5)[2])
+        app.ui["confirm"] = dict(c.procs.top()[2])
     img = Renderer().render(page, c.s, app.ui)
     img.save(path)
     c.mic.stop() if not mock else None
